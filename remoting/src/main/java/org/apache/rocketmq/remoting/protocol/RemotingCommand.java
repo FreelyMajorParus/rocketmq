@@ -142,21 +142,27 @@ public class RemotingCommand {
     }
 
     public static RemotingCommand decode(final ByteBuffer byteBuffer) {
+        // 缓冲区的总长度
         int length = byteBuffer.limit();
+        // 获取Header的长度
         int oriHeaderLen = byteBuffer.getInt();
         int headerLength = getHeaderLength(oriHeaderLen);
 
         byte[] headerData = new byte[headerLength];
+        // 将header的数据写入到字节数据组中
         byteBuffer.get(headerData);
 
+        // 根据不同的协议来解析出header
         RemotingCommand cmd = headerDecode(headerData, getProtocolType(oriHeaderLen));
 
+        // 计算出body的长度
         int bodyLength = length - 4 - headerLength;
         byte[] bodyData = null;
         if (bodyLength > 0) {
             bodyData = new byte[bodyLength];
             byteBuffer.get(bodyData);
         }
+        // 设置body的数据
         cmd.body = bodyData;
 
         return cmd;
@@ -340,7 +346,7 @@ public class RemotingCommand {
 
         ByteBuffer result = ByteBuffer.allocate(4 + length);
 
-        // length
+        // length 代表总长度(包含了4 + headerLength + bodyLength) , 最初4个字节就是用于存储数据的总长度
         result.putInt(length);
 
         // header length

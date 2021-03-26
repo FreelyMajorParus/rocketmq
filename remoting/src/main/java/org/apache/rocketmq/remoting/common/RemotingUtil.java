@@ -38,8 +38,8 @@ public class RemotingUtil {
     public static final String OS_NAME = System.getProperty("os.name");
 
     private static final InternalLogger log = InternalLoggerFactory.getLogger(RemotingHelper.ROCKETMQ_REMOTING);
-    private static boolean isLinuxPlatform = false;
-    private static boolean isWindowsPlatform = false;
+    private static boolean isLinuxPlatform = false; // 是否是Linux平台
+    private static boolean isWindowsPlatform = false; // 是否是Windows平台
 
     static {
         if (OS_NAME != null && OS_NAME.toLowerCase().contains("linux")) {
@@ -58,7 +58,7 @@ public class RemotingUtil {
     public static Selector openSelector() throws IOException {
         Selector result = null;
 
-        if (isLinuxPlatform()) {
+        if (isLinuxPlatform()) { // 如果是linux平台，尝试使用Epoll模型开启Selector
             try {
                 final Class<?> providerClazz = Class.forName("sun.nio.ch.EPollSelectorProvider");
                 if (providerClazz != null) {
@@ -80,6 +80,7 @@ public class RemotingUtil {
         }
 
         if (result == null) {
+            // 如果无法使用Epoll模型，则只好使用JDK底层自动选择Epoll或者Poll模型
             result = Selector.open();
         }
 
@@ -90,18 +91,23 @@ public class RemotingUtil {
         return isLinuxPlatform;
     }
 
+    /**
+     * 获取本机地址
+     * @return 优先获取ipv4地址，如果ipv4获取不到，则获取ipv6地址
+     */
     public static String getLocalAddress() {
         try {
             // Traversal Network interface to get the first non-loopback and non-private address
+            // 首先获取当前机器内部所有的网络接口
             Enumeration<NetworkInterface> enumeration = NetworkInterface.getNetworkInterfaces();
             ArrayList<String> ipv4Result = new ArrayList<String>();
             ArrayList<String> ipv6Result = new ArrayList<String>();
-            while (enumeration.hasMoreElements()) {
+            while (enumeration.hasMoreElements()) { // 遍历机器内部的所有网络接口
                 final NetworkInterface networkInterface = enumeration.nextElement();
                 final Enumeration<InetAddress> en = networkInterface.getInetAddresses();
                 while (en.hasMoreElements()) {
                     final InetAddress address = en.nextElement();
-                    if (!address.isLoopbackAddress()) {
+                    if (!address.isLoopbackAddress()) { // 非回环地址
                         if (address instanceof Inet6Address) {
                             ipv6Result.add(normalizeHostAddress(address));
                         } else {
@@ -112,6 +118,7 @@ public class RemotingUtil {
             }
 
             // prefer ipv4
+            // 优先使用ipv4地址, 如果ipv4地址不为空，则跳过127和1192地址
             if (!ipv4Result.isEmpty()) {
                 for (String ip : ipv4Result) {
                     if (ip.startsWith("127.0") || ip.startsWith("192.168")) {
@@ -120,13 +127,16 @@ public class RemotingUtil {
 
                     return ip;
                 }
-
+                // 实在找不到，就用最后一个
                 return ipv4Result.get(ipv4Result.size() - 1);
             } else if (!ipv6Result.isEmpty()) {
+                // 如果ipv4地址为空，而ipv6地址不为空，则直接返回ipv6的第一个地址
                 return ipv6Result.get(0);
             }
+            // 如果还是找不到地址，则只好用本机地址
             //If failed to find,fall back to localhost
             final InetAddress localHost = InetAddress.getLocalHost();
+            // 127.0.0.1
             return normalizeHostAddress(localHost);
         } catch (Exception e) {
             log.error("Failed to obtain local address", e);
@@ -135,6 +145,9 @@ public class RemotingUtil {
         return null;
     }
 
+    /**
+     * 获取Host地址， 如果是Ipv6,则返回的数据前后加[/]
+     */
     public static String normalizeHostAddress(final InetAddress localHost) {
         if (localHost instanceof Inet6Address) {
             return "[" + localHost.getHostAddress() + "]";
@@ -143,6 +156,9 @@ public class RemotingUtil {
         }
     }
 
+    /**
+     * 根据字符串转换成IP地址对象
+     */
     public static SocketAddress string2SocketAddress(final String addr) {
         int split = addr.lastIndexOf(":");
         String host = addr.substring(0, split);
@@ -151,6 +167,9 @@ public class RemotingUtil {
         return isa;
     }
 
+    /**
+     * 将IP地址对象转换成字符串ip:port
+     */
     public static String socketAddress2String(final SocketAddress addr) {
         StringBuilder sb = new StringBuilder();
         InetSocketAddress inetSocketAddress = (InetSocketAddress) addr;
@@ -160,10 +179,16 @@ public class RemotingUtil {
         return sb.toString();
     }
 
+    /**
+     * 连接到一个远程地址
+     */
     public static SocketChannel connect(SocketAddress remote) {
         return connect(remote, 1000 * 5);
     }
 
+    /**
+     * 连接到远程, 阻塞连接成功之后, 设置为非阻塞模式
+     */
     public static SocketChannel connect(SocketAddress remote, final int timeoutMillis) {
         SocketChannel sc = null;
         try {
@@ -189,15 +214,21 @@ public class RemotingUtil {
         return null;
     }
 
+    /**
+     * 关闭通道(Netty通道 部分)
+     */
     public static void closeChannel(Channel channel) {
         final String addrRemote = RemotingHelper.parseChannelRemoteAddr(channel);
         channel.close().addListener(new ChannelFutureListener() {
             @Override
             public void operationComplete(ChannelFuture future) throws Exception {
                 log.info("closeChannel: close the connection to remote address[{}] result: {}", addrRemote,
-                    future.isSuccess());
+                        future.isSuccess());
             }
         });
     }
 
+    public static void main(String[] args) {
+        String localAddress = getLocalAddress();
+    }
 }

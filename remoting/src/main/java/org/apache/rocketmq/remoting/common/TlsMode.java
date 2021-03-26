@@ -25,10 +25,22 @@ package org.apache.rocketmq.remoting.common;
  *     <li><strong>enforcing:</strong> SSL is required, aka, non SSL connection will be rejected.</li>
  * </ol>
  */
-public enum TlsMode {
 
+/**
+ * 三种SSL模式
+ */
+public enum TlsMode {
+    /**
+     * 不需要SSL, 任何SSL过来的挥手请求都会被拒绝,导致连接被关闭
+     */
     DISABLED("disabled"),
+    /**
+     * SSL可选，客户端请求有SSL和没有SSL, 都没关系
+     */
     PERMISSIVE("permissive"),
+    /**
+     * 必须要有SSL, 如果没有SSL, 连接将会被拒绝
+     */
     ENFORCING("enforcing");
 
     private String name;
