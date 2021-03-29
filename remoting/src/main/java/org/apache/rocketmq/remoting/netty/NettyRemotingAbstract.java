@@ -154,10 +154,10 @@ public abstract class NettyRemotingAbstract {
         final RemotingCommand cmd = msg;
         if (cmd != null) {
             switch (cmd.getType()) {
-                case REQUEST_COMMAND:
+                case REQUEST_COMMAND: // 来自请求命令
                     processRequestCommand(ctx, cmd);
                     break;
-                case RESPONSE_COMMAND:
+                case RESPONSE_COMMAND: // 来自响应命令
                     processResponseCommand(ctx, cmd);
                     break;
                 default:
@@ -199,16 +199,19 @@ public abstract class NettyRemotingAbstract {
                 @Override
                 public void run() {
                     try {
+                        // 执行远程RPC Hook前置方法
                         doBeforeRpcHooks(RemotingHelper.parseChannelRemoteAddr(ctx.channel()), cmd);
                         final RemotingResponseCallback callback = new RemotingResponseCallback() {
                             @Override
                             public void callback(RemotingCommand response) {
+                                // 执行远程RPC Hook后置方法
                                 doAfterRpcHooks(RemotingHelper.parseChannelRemoteAddr(ctx.channel()), cmd, response);
-                                if (!cmd.isOnewayRPC()) {
+                                if (!cmd.isOnewayRPC()) { // 非OneWay请求，OneWay请求不需要响应
                                     if (response != null) {
                                         response.setOpaque(opaque);
                                         response.markResponseType();
                                         try {
+                                            // 将response刷新出缓冲区
                                             ctx.writeAndFlush(response);
                                         } catch (Throwable e) {
                                             log.error("process request over, but response failed", e);
@@ -316,6 +319,7 @@ public abstract class NettyRemotingAbstract {
                     @Override
                     public void run() {
                         try {
+                            // 执行回调方法
                             responseFuture.executeInvokeCallback();
                         } catch (Throwable e) {
                             log.warn("execute callback in executor exception, and callback throw", e);
@@ -379,23 +383,29 @@ public abstract class NettyRemotingAbstract {
      * <p>
      * This method is periodically invoked to scan and expire deprecated request.
      * </p>
+     * 每隔一段时间扫描一下responseTable, 将一些超时的请求给废弃掉
      */
     public void scanResponseTable() {
         final List<ResponseFuture> rfList = new LinkedList<ResponseFuture>();
         Iterator<Entry<Integer, ResponseFuture>> it = this.responseTable.entrySet().iterator();
         while (it.hasNext()) {
+            // 扫描responseTable
             Entry<Integer, ResponseFuture> next = it.next();
             ResponseFuture rep = next.getValue();
 
             if ((rep.getBeginTimestamp() + rep.getTimeoutMillis() + 1000) <= System.currentTimeMillis()) {
+                // 当前响应已经超时
                 rep.release();
+                // 从表中移除
                 it.remove();
+                // 加入到一个新的队列里面
                 rfList.add(rep);
                 log.warn("remove timeout request, " + rep);
             }
         }
 
         for (ResponseFuture rf : rfList) {
+            // 遍历被废弃的响应
             try {
                 executeInvokeCallback(rf);
             } catch (Throwable e) {

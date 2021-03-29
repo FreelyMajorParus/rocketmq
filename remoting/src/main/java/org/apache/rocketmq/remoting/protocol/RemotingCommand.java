@@ -406,12 +406,16 @@ public class RemotingCommand {
         return encodeHeader(this.body != null ? this.body.length : 0);
     }
 
+    /**
+     * header数据编码
+     */
     public ByteBuffer encodeHeader(final int bodyLength) {
-        // 1> header length size
+        // 1> header length size 4个字节长度的header数据长度，也就是前4个字节里面存放的是当前消息体里面，Header数据的总长度
         int length = 4;
 
         // 2> header data length
         byte[] headerData;
+        // 消息头编码
         headerData = this.headerEncode();
 
         length += headerData.length;

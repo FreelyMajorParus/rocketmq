@@ -27,6 +27,9 @@ import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 
+/**
+ * 通用的Netty编码器
+ */
 @ChannelHandler.Sharable
 public class NettyEncoder extends MessageToByteEncoder<RemotingCommand> {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(RemotingHelper.ROCKETMQ_REMOTING);
@@ -35,10 +38,14 @@ public class NettyEncoder extends MessageToByteEncoder<RemotingCommand> {
     public void encode(ChannelHandlerContext ctx, RemotingCommand remotingCommand, ByteBuf out)
         throws Exception {
         try {
+            // header数据编码
             ByteBuffer header = remotingCommand.encodeHeader();
+            // 写入到缓冲区
             out.writeBytes(header);
+            // 获取到body数据
             byte[] body = remotingCommand.getBody();
             if (body != null) {
+                // 将body数据写入到缓冲区中
                 out.writeBytes(body);
             }
         } catch (Exception e) {

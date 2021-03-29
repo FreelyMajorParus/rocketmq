@@ -109,7 +109,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         if (publicThreadNums <= 0) {
             publicThreadNums = 4;
         }
-
+        // 公共线程池
         this.publicExecutor = Executors.newFixedThreadPool(publicThreadNums, new ThreadFactory() {
             private AtomicInteger threadIndex = new AtomicInteger(0);
 
@@ -147,6 +147,10 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         return Math.abs(r.nextInt() % 999) % 999;
     }
 
+    /**
+     * 1. 每隔1秒扫描一下responseTable，将过期的请求废弃掉
+     * 2. 有通道事件监听器的话，监听事件
+     */
     @Override
     public void start() {
         this.defaultEventExecutorGroup = new DefaultEventExecutorGroup(
@@ -189,6 +193,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
                 }
             });
 
+        // 每隔1秒扫描一下responseTable，将过期的请求废弃掉
         this.timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
@@ -201,6 +206,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
         }, 1000 * 3, 1000);
 
         if (this.channelEventListener != null) {
+            // 有通道事件监听器的话，监听事件
             this.nettyEventExecutor.start();
         }
     }
@@ -208,8 +214,10 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
     @Override
     public void shutdown() {
         try {
+            // 停止扫描responseTable
             this.timer.cancel();
 
+            // 关闭通道
             for (ChannelWrapper cw : this.channelTables.values()) {
                 this.closeChannel(null, cw.getChannel());
             }
