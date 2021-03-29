@@ -108,6 +108,7 @@ public class BrokerStartup {
             }
 
             final BrokerConfig brokerConfig = new BrokerConfig();
+            brokerConfig.setNamesrvAddr("127.0.0.1:9876");
             final NettyServerConfig nettyServerConfig = new NettyServerConfig();
             final NettyClientConfig nettyClientConfig = new NettyClientConfig();
 
@@ -142,6 +143,7 @@ public class BrokerStartup {
 
             MixAll.properties2Object(ServerUtil.commandLine2Properties(commandLine), brokerConfig);
 
+            brokerConfig.setRocketmqHome("/Users/admin/projects/HOME/");
             if (null == brokerConfig.getRocketmqHome()) {
                 System.out.printf("Please set the %s variable in your environment to match the location of the RocketMQ installation", MixAll.ROCKETMQ_HOME_ENV);
                 System.exit(-2);
