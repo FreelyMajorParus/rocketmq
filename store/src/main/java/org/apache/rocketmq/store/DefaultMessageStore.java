@@ -182,25 +182,30 @@ public class DefaultMessageStore implements MessageStore {
         boolean result = true;
 
         try {
+            // 判断上次关闭broker是否是正常关闭的
             boolean lastExitOK = !this.isTempFileExist();
             log.info("last shutdown {}", lastExitOK ? "normally" : "abnormally");
 
+            // 加载delayOffset.json
             if (null != scheduleMessageService) {
                 result = result && this.scheduleMessageService.load();
             }
 
-            // load Commit Log
+            // 加载Commit Log文件
             result = result && this.commitLog.load();
 
-            // load Consume Queue
+            // 加载Consume Queue文件
             result = result && this.loadConsumeQueue();
 
             if (result) {
+                // 加载checkPoint
                 this.storeCheckpoint =
                     new StoreCheckpoint(StorePathConfigHelper.getStoreCheckpoint(this.messageStoreConfig.getStorePathRootDir()));
 
+                // 加载索引文件
                 this.indexService.load(lastExitOK);
 
+                // 恢复
                 this.recover(lastExitOK);
 
                 log.info("load over, and the max phy offset = {}", this.getMaxPhyOffset());
@@ -416,12 +421,12 @@ public class DefaultMessageStore implements MessageStore {
 
     @Override
     public CompletableFuture<PutMessageResult> asyncPutMessage(MessageExtBrokerInner msg) {
-        PutMessageStatus checkStoreStatus = this.checkStoreStatus();
+        PutMessageStatus checkStoreStatus = this.checkStoreStatus(); // 检查store状态
         if (checkStoreStatus != PutMessageStatus.PUT_OK) {
             return CompletableFuture.completedFuture(new PutMessageResult(checkStoreStatus, null));
         }
 
-        PutMessageStatus msgCheckStatus = this.checkMessage(msg);
+        PutMessageStatus msgCheckStatus = this.checkMessage(msg); // 检查消息体
         if (msgCheckStatus == PutMessageStatus.MESSAGE_ILLEGAL) {
             return CompletableFuture.completedFuture(new PutMessageResult(msgCheckStatus, null));
         }
@@ -1375,6 +1380,10 @@ public class DefaultMessageStore implements MessageStore {
         return file.exists();
     }
 
+    /**
+     * 加载ConsumeQueue
+     * @return
+     */
     private boolean loadConsumeQueue() {
         File dirLogic = new File(StorePathConfigHelper.getStorePathConsumeQueue(this.messageStoreConfig.getStorePathRootDir()));
         File[] fileTopicList = dirLogic.listFiles();
@@ -1388,6 +1397,7 @@ public class DefaultMessageStore implements MessageStore {
                     for (File fileQueueId : fileQueueIdList) {
                         int queueId;
                         try {
+                            // 文件名称 = queueId
                             queueId = Integer.parseInt(fileQueueId.getName());
                         } catch (NumberFormatException e) {
                             continue;
@@ -1398,6 +1408,7 @@ public class DefaultMessageStore implements MessageStore {
                             StorePathConfigHelper.getStorePathConsumeQueue(this.messageStoreConfig.getStorePathRootDir()),
                             this.getMessageStoreConfig().getMappedFileSizeConsumeQueue(),
                             this);
+                        // 初始化consumeQueueTable
                         this.putConsumeQueue(topic, queueId, logic);
                         if (!logic.load()) {
                             return false;
@@ -1412,7 +1423,9 @@ public class DefaultMessageStore implements MessageStore {
         return true;
     }
 
+    // 数据恢复
     private void recover(final boolean lastExitOK) {
+        // 从ConsumeQueue中恢复
         long maxPhyOffsetOfConsumeQueue = this.recoverConsumeQueue();
 
         if (lastExitOK) {
@@ -1882,6 +1895,10 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
+    /**
+     * 消息转移
+     * commitLog -> consumeQueue
+     */
     class ReputMessageService extends ServiceThread {
 
         private volatile long reputFromOffset = 0;

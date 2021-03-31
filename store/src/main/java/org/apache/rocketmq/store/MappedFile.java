@@ -159,6 +159,10 @@ public class MappedFile extends ReferenceResource {
 
         try {
             this.fileChannel = new RandomAccessFile(this.file, "rw").getChannel();
+            // 内存映射
+            // 当调用Mmap进行内存映射后，OS只是建立了虚拟内存地址至物理地址的映射表，而实际并没有加载任何文件至内存中。
+            // 程序要访问数据时，OS会检查该部分的分页是否已经在内存中，如果不在，则发出一次 缺页中断。X86的Linux中一个标准页面大小是4KB，
+            // 那么1G的CommitLog需要发生 1024KB/4KB=256次 缺页中断，才能使得对应的数据完全加载至物理内存中。
             this.mappedByteBuffer = this.fileChannel.map(MapMode.READ_WRITE, 0, fileSize);
             TOTAL_MAPPED_VIRTUAL_MEMORY.addAndGet(fileSize);
             TOTAL_MAPPED_FILES.incrementAndGet();
@@ -202,7 +206,7 @@ public class MappedFile extends ReferenceResource {
 
         int currentPos = this.wrotePosition.get();
 
-        if (currentPos < this.fileSize) {
+        if (currentPos < this.fileSize) { // 该文件内部空间还可以写入
             ByteBuffer byteBuffer = writeBuffer != null ? writeBuffer.slice() : this.mappedByteBuffer.slice();
             byteBuffer.position(currentPos);
             AppendMessageResult result;

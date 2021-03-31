@@ -153,8 +153,10 @@ public abstract class NettyRemotingAbstract {
     public void processMessageReceived(ChannelHandlerContext ctx, RemotingCommand msg) throws Exception {
         final RemotingCommand cmd = msg;
         if (cmd != null) {
+            // 根据消息体中的flag数据，判断是否是响应请求
             switch (cmd.getType()) {
                 case REQUEST_COMMAND: // 来自请求命令
+                    // 处理请求指令
                     processRequestCommand(ctx, cmd);
                     break;
                 case RESPONSE_COMMAND: // 来自响应命令

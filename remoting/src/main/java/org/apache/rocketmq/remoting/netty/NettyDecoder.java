@@ -29,7 +29,7 @@ import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 /**
  * Netty解码器, 第一印象就是Netty的通用解码器
  * 基于Netty的长度可控解码器的基础上在进行解码
- * why? 为什么不直接加一个新的解码器呢？可以加入到链式的解码器之后就号
+ * why? 为什么不直接加一个新的解码器呢？可以加入到链式的解码器之后就好
  */
 public class NettyDecoder extends LengthFieldBasedFrameDecoder {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(RemotingHelper.ROCKETMQ_REMOTING);

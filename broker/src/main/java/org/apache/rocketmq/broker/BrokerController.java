@@ -261,6 +261,7 @@ public class BrokerController {
         result = result && this.messageStore.load();
 
         if (result) {
+            // 实例化NettyRemotingServer在BrokerController内部
             this.remotingServer = new NettyRemotingServer(this.nettyServerConfig, this.clientHousekeepingService);
             NettyServerConfig fastConfig = (NettyServerConfig) this.nettyServerConfig.clone();
             fastConfig.setListenPort(nettyServerConfig.getListenPort() - 2);
@@ -329,10 +330,14 @@ public class BrokerController {
                 Executors.newFixedThreadPool(this.brokerConfig.getConsumerManageThreadPoolNums(), new ThreadFactoryImpl(
                     "ConsumerManageThread_"));
 
+            // 注册每种RequestCode对应的处理器
             this.registerProcessor();
 
+            // 启动定时任务
             final long initialDelay = UtilAll.computeNextMorningTimeMillis() - System.currentTimeMillis();
             final long period = 1000 * 60 * 60 * 24;
+
+            // 每天凌晨记录前一天写入和获取消息的总次数
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
                 @Override
                 public void run() {
@@ -344,6 +349,7 @@ public class BrokerController {
                 }
             }, initialDelay, period, TimeUnit.MILLISECONDS);
 
+            // 每隔5秒钟将持久化一次consumerOffset
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
                 @Override
                 public void run() {
@@ -355,6 +361,7 @@ public class BrokerController {
                 }
             }, 1000 * 10, this.brokerConfig.getFlushConsumerOffsetInterval(), TimeUnit.MILLISECONDS);
 
+            // 每隔10秒钟持久化consumerFilter
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
                 @Override
                 public void run() {
@@ -366,6 +373,7 @@ public class BrokerController {
                 }
             }, 1000 * 10, 1000 * 10, TimeUnit.MILLISECONDS);
 
+            // 每隔3分钟检查Broker的安全，如果消费者消费过慢，要关闭该订阅组的订阅状态
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
                 @Override
                 public void run() {
@@ -377,6 +385,7 @@ public class BrokerController {
                 }
             }, 3, 3, TimeUnit.MINUTES);
 
+            // 每隔1秒打印线程池对应的queue的大小
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
                 @Override
                 public void run() {
@@ -388,6 +397,7 @@ public class BrokerController {
                 }
             }, 10, 1, TimeUnit.SECONDS);
 
+            // 每隔60秒打印broker中CommitLog内部落后dispatch的字节总数
             this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
                 @Override
@@ -401,11 +411,12 @@ public class BrokerController {
             }, 1000 * 10, 1000 * 60, TimeUnit.MILLISECONDS);
 
             if (this.brokerConfig.getNamesrvAddr() != null) {
+                // 根据配置文件，更新NameServ地址
                 this.brokerOuterAPI.updateNameServerAddressList(this.brokerConfig.getNamesrvAddr());
                 log.info("Set user specified name server address: {}", this.brokerConfig.getNamesrvAddr());
             } else if (this.brokerConfig.isFetchNamesrvAddrByAddressServer()) {
+                // 每隔2分钟从远程拉取nameserv地址
                 this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
-
                     @Override
                     public void run() {
                         try {
@@ -543,6 +554,9 @@ public class BrokerController {
         }
     }
 
+    /**
+     * 注册每种RequestCode对应的处理器
+     */
     public void registerProcessor() {
         /**
          * SendMessageProcessor
@@ -632,6 +646,9 @@ public class BrokerController {
         this.brokerStats = brokerStats;
     }
 
+    /**
+     * 保护broker，如果消费者消费过慢，要关闭该订阅组的订阅状态
+     */
     public void protectBroker() {
         if (this.brokerConfig.isDisableConsumeIfConsumerReadSlowly()) {
             final Iterator<Map.Entry<String, MomentStatsItem>> it = this.brokerStatsManager.getMomentStatsItemSetFallSize().getStatsItemTable().entrySet().iterator();
