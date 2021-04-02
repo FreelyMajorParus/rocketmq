@@ -810,6 +810,10 @@ public class DefaultMessageStore implements MessageStore {
         return this.storeStatsService.toString();
     }
 
+    /**
+     * 获取物理存储路径
+     * @return
+     */
     private String getStorePathPhysic() {
         String storePathPhysic = "";
         if (DefaultMessageStore.this.getMessageStoreConfig().isEnableDLegerCommitLog()) {
@@ -1310,9 +1314,10 @@ public class DefaultMessageStore implements MessageStore {
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
+                // 定时清理文件
                 DefaultMessageStore.this.cleanFilesPeriodically();
             }
-        }, 1000 * 60, this.messageStoreConfig.getCleanResourceInterval(), TimeUnit.MILLISECONDS);
+        }, 0, this.messageStoreConfig.getCleanResourceInterval(), TimeUnit.MILLISECONDS);
 
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
             @Override
@@ -1355,6 +1360,9 @@ public class DefaultMessageStore implements MessageStore {
         }, 1000L, 10000L, TimeUnit.MILLISECONDS);
     }
 
+    /**
+     * 定时清理commitLog和consumeQueue文件
+     */
     private void cleanFilesPeriodically() {
         this.cleanCommitLogService.run();
         this.cleanConsumeQueueService.run();
@@ -1634,19 +1642,26 @@ public class DefaultMessageStore implements MessageStore {
 
         private void deleteExpiredFiles() {
             int deleteCount = 0;
+            // 文件存留的时间，默认是72h
             long fileReservedTime = DefaultMessageStore.this.getMessageStoreConfig().getFileReservedTime();
+            // 每隔多久移除一个文件
             int deletePhysicFilesInterval = DefaultMessageStore.this.getMessageStoreConfig().getDeleteCommitLogFilesInterval();
+            // 每隔多久需要做强制删除(因为删除的时候，如果该文件正有引用，就不能删除，但是这个标识可以配置多久可以强制删除一次)
             int destroyMapedFileIntervalForcibly = DefaultMessageStore.this.getMessageStoreConfig().getDestroyMapedFileIntervalForcibly();
-
+            // 是否到时间了，默认配置的是每天4点开始删除文件
             boolean timeup = this.isTimeToDelete();
+            // 磁盘空间是否已满
             boolean spacefull = this.isSpaceToDelete();
+            // 剩余可以人工删除的次数
             boolean manualDelete = this.manualDeleteFileSeveralTimes > 0;
 
             if (timeup || spacefull || manualDelete) {
 
                 if (manualDelete)
+                    // 如果是人工删除，剩余可人工删除的次数-1
                     this.manualDeleteFileSeveralTimes--;
 
+                // 是否要立即删除, 如果磁盘空间满了，即使是文件未过期，也要准备删除
                 boolean cleanAtOnce = DefaultMessageStore.this.getMessageStoreConfig().isCleanFileForciblyEnable() && this.cleanImmediately;
 
                 log.info("begin to delete before {} hours file. timeup: {} spacefull: {} manualDeleteFileSeveralTimes: {} cleanAtOnce: {}",
@@ -1656,8 +1671,9 @@ public class DefaultMessageStore implements MessageStore {
                     manualDeleteFileSeveralTimes,
                     cleanAtOnce);
 
-                fileReservedTime *= 60 * 60 * 1000;
+                fileReservedTime *= 60 * 60 * 1000; // 文件存留时间->毫秒数
 
+                // 删除过期文件
                 deleteCount = DefaultMessageStore.this.commitLog.deleteExpiredFile(fileReservedTime, deletePhysicFilesInterval,
                     destroyMapedFileIntervalForcibly, cleanAtOnce);
                 if (deleteCount > 0) {
@@ -1683,8 +1699,13 @@ public class DefaultMessageStore implements MessageStore {
             return CleanCommitLogService.class.getSimpleName();
         }
 
+        /**
+         * 当前是否达到删除文件的小时
+         */
         private boolean isTimeToDelete() {
+            // 默认是每天的04点删除文件, 可以配置多个时间段，用;符号分割
             String when = DefaultMessageStore.this.getMessageStoreConfig().getDeleteWhen();
+            // 当前小时=配置删除的小时数
             if (UtilAll.isItTimeToDo(when)) {
                 DefaultMessageStore.log.info("it's time to reclaim disk space, " + when);
                 return true;
@@ -1693,21 +1714,31 @@ public class DefaultMessageStore implements MessageStore {
             return false;
         }
 
+        /**
+         * 根据磁盘所剩余空间来判断是否要立即清理文件，
+         * 检查CommitLog文件的占用空间，其实是要看CommitLog所在的磁盘分区是否接近配置的饱和度
+         *
+         * NOTE: 内部的代码块应该是用于区分变量的访问范围, 例如diskok在上面和下面的代码块中不相关
+         */
         private boolean isSpaceToDelete() {
+            // 获取配置的磁盘可使用最大的比例, 默认是75%
             double ratio = DefaultMessageStore.this.getMessageStoreConfig().getDiskMaxUsedSpaceRatio() / 100.0;
 
             cleanImmediately = false;
 
             {
+                // CommitLog
+                // 当前文件已写入内容百分比
                 double physicRatio = UtilAll.getDiskPartitionSpaceUsedPercent(getStorePathPhysic());
-                if (physicRatio > diskSpaceWarningLevelRatio) {
+                if (physicRatio > diskSpaceWarningLevelRatio) { // 默认大于90%
+                    // 都大于90%了，直接标志这个磁盘已经满了
                     boolean diskok = DefaultMessageStore.this.runningFlags.getAndMakeDiskFull();
                     if (diskok) {
                         DefaultMessageStore.log.error("physic disk maybe full soon " + physicRatio + ", so mark disk full");
                     }
-
+                    // 需要立即清理
                     cleanImmediately = true;
-                } else if (physicRatio > diskSpaceCleanForciblyRatio) {
+                } else if (physicRatio > diskSpaceCleanForciblyRatio) { // 默认大于85%
                     cleanImmediately = true;
                 } else {
                     boolean diskok = DefaultMessageStore.this.runningFlags.getAndMakeDiskOK();
@@ -1723,6 +1754,8 @@ public class DefaultMessageStore implements MessageStore {
             }
 
             {
+
+                // ConsumeQueue
                 String storePathLogics = StorePathConfigHelper
                     .getStorePathConsumeQueue(DefaultMessageStore.this.getMessageStoreConfig().getStorePathRootDir());
                 double logicsRatio = UtilAll.getDiskPartitionSpaceUsedPercent(storePathLogics);
@@ -1961,6 +1994,7 @@ public class DefaultMessageStore implements MessageStore {
 
                             if (dispatchRequest.isSuccess()) {
                                 if (size > 0) {
+                                    // 分发请求
                                     DefaultMessageStore.this.doDispatch(dispatchRequest);
 
                                     if (BrokerRole.SLAVE != DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole()
@@ -2018,6 +2052,7 @@ public class DefaultMessageStore implements MessageStore {
             while (!this.isStopped()) {
                 try {
                     Thread.sleep(1);
+                    // 开始转移消息
                     this.doReput();
                 } catch (Exception e) {
                     DefaultMessageStore.log.warn(this.getServiceName() + " service has exception. ", e);

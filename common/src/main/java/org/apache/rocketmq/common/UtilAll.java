@@ -214,13 +214,14 @@ public class UtilAll {
                 return -1;
             }
 
-
+            // 文件的总占用空间
             long totalSpace = file.getTotalSpace();
 
             if (totalSpace > 0) {
+                // 获取文件内部的可用空间, 剩余空间
                 long freeSpace = file.getFreeSpace();
                 long usedSpace = totalSpace - freeSpace;
-
+                // 返回当前文件已写入内容百分比
                 return usedSpace / (double) totalSpace;
             }
         } catch (Exception e) {
