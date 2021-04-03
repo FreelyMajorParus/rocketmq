@@ -37,6 +37,7 @@ import org.apache.rocketmq.remoting.netty.TlsSystemConfig;
 import org.apache.rocketmq.remoting.protocol.RemotingCommand;
 import org.apache.rocketmq.srvutil.ServerUtil;
 import org.apache.rocketmq.store.config.BrokerRole;
+import org.apache.rocketmq.store.config.FlushDiskType;
 import org.apache.rocketmq.store.config.MessageStoreConfig;
 import org.slf4j.LoggerFactory;
 
@@ -116,6 +117,7 @@ public class BrokerStartup {
                 String.valueOf(TlsSystemConfig.tlsMode == TlsMode.ENFORCING))));
             nettyServerConfig.setListenPort(10911);
             final MessageStoreConfig messageStoreConfig = new MessageStoreConfig();
+            messageStoreConfig.setFlushDiskType(FlushDiskType.SYNC_FLUSH);
 
             if (BrokerRole.SLAVE == messageStoreConfig.getBrokerRole()) {
                 int ratio = messageStoreConfig.getAccessMessageInMemoryMaxRatio() - 10;
@@ -142,8 +144,7 @@ public class BrokerStartup {
             }
 
             MixAll.properties2Object(ServerUtil.commandLine2Properties(commandLine), brokerConfig);
-
-            brokerConfig.setRocketmqHome("/Users/admin/projects/HOME/");
+            brokerConfig.setRocketmqHome("/Users/admin/rocketmq/doc_tmp");
             if (null == brokerConfig.getRocketmqHome()) {
                 System.out.printf("Please set the %s variable in your environment to match the location of the RocketMQ installation", MixAll.ROCKETMQ_HOME_ENV);
                 System.exit(-2);

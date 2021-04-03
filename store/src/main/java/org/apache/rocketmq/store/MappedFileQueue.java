@@ -438,6 +438,7 @@ public class MappedFileQueue {
 
     public boolean flush(final int flushLeastPages) {
         boolean result = true;
+        // 根据最近刷盘的位置，找到MappedFile
         MappedFile mappedFile = this.findMappedFileByOffset(this.flushedWhere, this.flushedWhere == 0);
         if (mappedFile != null) {
             long tmpTimeStamp = mappedFile.getStoreTimestamp();
@@ -455,6 +456,7 @@ public class MappedFileQueue {
 
     public boolean commit(final int commitLeastPages) {
         boolean result = true;
+        // 根据最近commit的位置，找到MappedFile
         MappedFile mappedFile = this.findMappedFileByOffset(this.committedWhere, this.committedWhere == 0);
         if (mappedFile != null) {
             int offset = mappedFile.commit(commitLeastPages);

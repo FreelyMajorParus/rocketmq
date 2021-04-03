@@ -280,6 +280,7 @@ public class MappedFile extends ReferenceResource {
                 try {
                     //We only append data to fileChannel or mappedByteBuffer, never both.
                     if (writeBuffer != null || this.fileChannel.position() != 0) {
+                        // 真正刷盘的核心方法调用
                         this.fileChannel.force(false);
                     } else {
                         this.mappedByteBuffer.force();
@@ -331,6 +332,9 @@ public class MappedFile extends ReferenceResource {
                 byteBuffer.position(lastCommittedPosition);
                 byteBuffer.limit(writePos);
                 this.fileChannel.position(lastCommittedPosition);
+                // 将数据刷到虚拟内存中,buteBuffer是分配过来的堆外内存，这个时候需要将堆外内存刷新到文件通道映射的虚拟内存中
+                // 至于这个文件映射的虚拟内存什么时候被刷到文件里面，那就要看fileChannel本身的异步刷盘了，当然在写入到虚拟内存之后，也会通知到文件通道
+                // 去刷一次盘。
                 this.fileChannel.write(byteBuffer);
                 this.committedPosition.set(writePos);
             } catch (Throwable e) {

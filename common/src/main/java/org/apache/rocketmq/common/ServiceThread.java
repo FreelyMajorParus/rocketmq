@@ -22,6 +22,9 @@ import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.logging.InternalLoggerFactory;
 
+/**
+ * 异步执行线程类
+ */
 public abstract class ServiceThread implements Runnable {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.COMMON_LOGGER_NAME);
 
@@ -121,7 +124,9 @@ public abstract class ServiceThread implements Runnable {
     }
 
     public void wakeup() {
+        // 如果通知已经被传达了，但是工作线程还没有处理结束，就不需要再通知了
         if (hasNotified.compareAndSet(false, true)) {
+            // 如果工作线程还在等待，就通知一下
             waitPoint.countDown(); // notify
         }
     }

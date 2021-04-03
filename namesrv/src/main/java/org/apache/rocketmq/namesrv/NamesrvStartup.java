@@ -83,7 +83,7 @@ public class NamesrvStartup {
         }
 
         final NamesrvConfig namesrvConfig = new NamesrvConfig();
-        namesrvConfig.setRocketmqHome("/Users/admin/projects/HOME/");
+        namesrvConfig.setRocketmqHome("/Users/admin/rocketmq/doc_tmp");
         final NettyServerConfig nettyServerConfig = new NettyServerConfig();
         nettyServerConfig.setListenPort(9876);
         if (commandLine.hasOption('c')) {

@@ -51,7 +51,6 @@ public class Producer {
          */
         producer.start();
 
-        for (int i = 0; i < 1000; i++) {
             try {
 
                 /*
@@ -59,7 +58,7 @@ public class Producer {
                  */
                 Message msg = new Message("TopicTest" /* Topic */,
                     "TagA" /* Tag */,
-                    ("Hello RocketMQ " + i).getBytes(RemotingHelper.DEFAULT_CHARSET) /* Message body */
+                    ("Hello RocketMQ " + 1).getBytes(RemotingHelper.DEFAULT_CHARSET) /* Message body */
                 );
 
                 /*
@@ -72,7 +71,6 @@ public class Producer {
                 e.printStackTrace();
                 Thread.sleep(1000);
             }
-        }
 
         /*
          * Shut down once the producer instance is not longer in use.
