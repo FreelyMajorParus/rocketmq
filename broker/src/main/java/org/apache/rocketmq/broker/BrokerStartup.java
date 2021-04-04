@@ -117,8 +117,9 @@ public class BrokerStartup {
                 String.valueOf(TlsSystemConfig.tlsMode == TlsMode.ENFORCING))));
             nettyServerConfig.setListenPort(10911);
             final MessageStoreConfig messageStoreConfig = new MessageStoreConfig();
-            messageStoreConfig.setFlushDiskType(FlushDiskType.SYNC_FLUSH);
-
+            messageStoreConfig.setFlushDiskType(FlushDiskType.ASYNC_FLUSH);
+            messageStoreConfig.setMappedFileSizeCommitLog(1024 * 10);
+            messageStoreConfig.setMappedFileSizeConsumeQueue(1024 * 1);
             if (BrokerRole.SLAVE == messageStoreConfig.getBrokerRole()) {
                 int ratio = messageStoreConfig.getAccessMessageInMemoryMaxRatio() - 10;
                 messageStoreConfig.setAccessMessageInMemoryMaxRatio(ratio);

@@ -63,6 +63,7 @@ public class CommitLog {
 
     private final AppendMessageCallback appendMessageCallback;
     private final ThreadLocal<MessageExtBatchEncoder> batchEncoderThreadLocal;
+    // TopicDemo-1
     protected HashMap<String/* topic-queueid */, Long/* offset */> topicQueueTable = new HashMap<String, Long>(1024);
     protected volatile long confirmOffset = -1L;
 
@@ -172,18 +173,24 @@ public class CommitLog {
 
     /**
      * When the normal exit, data recovery, all memory data have been flush
+     * Broker正常关闭之后，CommitLog的恢复
+     * ConsumeQueue落地的消息 >= CommitLog落地的消息，因为ConsumeQueue一定是在CommitLog落地之前构建的
      */
     public void recoverNormally(long maxPhyOffsetOfConsumeQueue) {
+        // 恢复时，是否要检查CRC值
         boolean checkCRCOnRecover = this.defaultMessageStore.getMessageStoreConfig().isCheckCRCOnRecover();
+        // 取出所有commitLog文件
         final List<MappedFile> mappedFiles = this.mappedFileQueue.getMappedFiles();
         if (!mappedFiles.isEmpty()) {
             // Began to recover from the last third file
+            // 从倒数第三个文件开始恢复
             int index = mappedFiles.size() - 3;
             if (index < 0)
                 index = 0;
 
             MappedFile mappedFile = mappedFiles.get(index);
             ByteBuffer byteBuffer = mappedFile.sliceByteBuffer();
+            // processOffset = 文件名称
             long processOffset = mappedFile.getFileFromOffset();
             long mappedFileOffset = 0;
             while (true) {
@@ -191,13 +198,14 @@ public class CommitLog {
                 int size = dispatchRequest.getMsgSize();
                 // Normal data
                 if (dispatchRequest.isSuccess() && size > 0) {
+                    // 正常向前推进
                     mappedFileOffset += size;
                 }
                 // Come the end of the file, switch to the next file Since the
                 // return 0 representatives met last hole,
                 // this can not be included in truncate offset
                 else if (dispatchRequest.isSuccess() && size == 0) {
-                    index++;
+                    index++; // 开始检查下一个文件
                     if (index >= mappedFiles.size()) {
                         // Current branch can not happen
                         log.info("recover last 3 physics file over, last mapped file " + mappedFile.getFileName());
@@ -217,13 +225,17 @@ public class CommitLog {
                 }
             }
 
+            // 确定最后一个消息索引位置
             processOffset += mappedFileOffset;
+            // 设置flushed索引
             this.mappedFileQueue.setFlushedWhere(processOffset);
+            // 设置commited索引
             this.mappedFileQueue.setCommittedWhere(processOffset);
+            // 清理文件，以及确定每个CommitLog文件对应的相关索引
             this.mappedFileQueue.truncateDirtyFiles(processOffset);
 
             // Clear ConsumeQueue redundant data
-            if (maxPhyOffsetOfConsumeQueue >= processOffset) {
+            if (maxPhyOffsetOfConsumeQueue >= processOffset) { // 如果consumeQueue的最大物理偏移进度大于CommitLog的最大物理偏移进度
                 log.warn("maxPhyOffsetOfConsumeQueue({}) >= processOffset({}), truncate dirty logic files", maxPhyOffsetOfConsumeQueue, processOffset);
                 this.defaultMessageStore.truncateDirtyLogicFiles(processOffset);
             }
@@ -430,15 +442,21 @@ public class CommitLog {
     }
 
     @Deprecated
+    /**
+     * 异常中恢复commitLog文件
+     * @param maxPhyOffsetOfConsumeQueue ConsumeQueue最大物理偏移量
+     */
     public void recoverAbnormally(long maxPhyOffsetOfConsumeQueue) {
         // recover by the minimum time stamp
         boolean checkCRCOnRecover = this.defaultMessageStore.getMessageStoreConfig().isCheckCRCOnRecover();
+        // 获取所有的MappedFile文件
         final List<MappedFile> mappedFiles = this.mappedFileQueue.getMappedFiles();
         if (!mappedFiles.isEmpty()) {
             // Looking beginning to recover from which file
             int index = mappedFiles.size() - 1;
             MappedFile mappedFile = null;
             for (; index >= 0; index--) {
+                // mappedFiles 从最后一个往前
                 mappedFile = mappedFiles.get(index);
                 if (this.isMappedFileMatchedRecover(mappedFile)) {
                     log.info("recover from this mapped file " + mappedFile.getFileName());
@@ -455,12 +473,14 @@ public class CommitLog {
             long processOffset = mappedFile.getFileFromOffset();
             long mappedFileOffset = 0;
             while (true) {
+                // 检查消息，并返回消息体大小
                 DispatchRequest dispatchRequest = this.checkMessageAndReturnSize(byteBuffer, checkCRCOnRecover);
                 int size = dispatchRequest.getMsgSize();
 
                 if (dispatchRequest.isSuccess()) {
                     // Normal data
                     if (size > 0) {
+                        // 当前消息是正常的，继续向前推进检查一下
                         mappedFileOffset += size;
 
                         if (this.defaultMessageStore.getMessageStoreConfig().isDuplicationEnable()) {
@@ -468,13 +488,15 @@ public class CommitLog {
                                 this.defaultMessageStore.doDispatch(dispatchRequest);
                             }
                         } else {
+                            // 构建consumeQueue数据结构与Index数据结构
+                            // 为什么就一定是这写入数据呢？
                             this.defaultMessageStore.doDispatch(dispatchRequest);
                         }
                     }
                     // Come the end of the file, switch to the next file
                     // Since the return 0 representatives met last hole, this can
                     // not be included in truncate offset
-                    else if (size == 0) {
+                    else if (size == 0) { // 为0表示，末尾的empty消息，需要切换到下一个文件
                         index++;
                         if (index >= mappedFiles.size()) {
                             // The current branch under normal circumstances should
@@ -490,6 +512,7 @@ public class CommitLog {
                         }
                     }
                 } else {
+                    // 当前文件有问题，从这个文件中恢复
                     log.info("recover physics file end, " + mappedFile.getFileName() + " pos=" + byteBuffer.position());
                     break;
                 }
@@ -508,6 +531,7 @@ public class CommitLog {
         }
         // Commitlog case files are deleted
         else {
+            // 当前没有commitLog文件，那就直接将consumeQueue文件也清空掉吧
             log.warn("The commitlog files are deleted, and delete the consume queue files");
             this.mappedFileQueue.setFlushedWhere(0);
             this.mappedFileQueue.setCommittedWhere(0);
@@ -515,11 +539,17 @@ public class CommitLog {
         }
     }
 
+    /**
+     * 当前文件是否适合用于commitLog数据恢复
+     * @param mappedFile
+     * @return
+     */
     private boolean isMappedFileMatchedRecover(final MappedFile mappedFile) {
         ByteBuffer byteBuffer = mappedFile.sliceByteBuffer();
 
         int magicCode = byteBuffer.getInt(MessageDecoder.MESSAGE_MAGIC_CODE_POSTION);
         if (magicCode != MESSAGE_MAGIC_CODE) {
+            // 要求第一个int值为魔数
             return false;
         }
 
@@ -528,6 +558,7 @@ public class CommitLog {
         int msgStoreTimePos = 4 + 4 + 4 + 4 + 4 + 8 + 8 + 4 + 8 + bornhostLength;
         long storeTimestamp = byteBuffer.getLong(msgStoreTimePos);
         if (0 == storeTimestamp) {
+            // 该消息一定要有存储时间戳
             return false;
         }
 
@@ -544,6 +575,7 @@ public class CommitLog {
                 log.info("find check timestamp, {} {}",
                     storeTimestamp,
                     UtilAll.timeMillisToHumanString(storeTimestamp));
+                // 如果当前时间不大于安全检测点，就可以做恢复文件用
                 return true;
             }
         }
@@ -622,6 +654,7 @@ public class CommitLog {
                 return CompletableFuture.completedFuture(new PutMessageResult(PutMessageStatus.CREATE_MAPEDFILE_FAILED, null));
             }
 
+            // 将消息写入到文件
             result = mappedFile.appendMessage(msg, this.appendMessageCallback); // 写入消息到commitLog文件
             switch (result.getStatus()) {
                 case PUT_OK:
@@ -1669,7 +1702,7 @@ public class CommitLog {
             this.msgStoreItemMemory.putInt(msgInner.getQueueId());
             // 5 FLAG flag
             this.msgStoreItemMemory.putInt(msgInner.getFlag());
-            // 6 QUEUEOFFSET 队列的offset
+            // 6 QUEUEOFFSET 队列的offset，为什么要在commitLog中防止逻辑队列的偏移量？
             this.msgStoreItemMemory.putLong(queueOffset);
             // 7 PHYSICALOFFSET 物理偏移量
             this.msgStoreItemMemory.putLong(fileFromOffset + byteBuffer.position());

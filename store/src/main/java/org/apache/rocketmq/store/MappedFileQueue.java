@@ -101,17 +101,21 @@ public class MappedFileQueue {
         return mfs;
     }
 
+    /**
+     * 恢复最后一个MappedFile文件的落盘文件， 并且删除多余的脏文件
+     * @param offset
+     */
     public void truncateDirtyFiles(long offset) {
         List<MappedFile> willRemoveFiles = new ArrayList<MappedFile>();
 
         for (MappedFile file : this.mappedFiles) {
-            long fileTailOffset = file.getFileFromOffset() + this.mappedFileSize;
+            long fileTailOffset = file.getFileFromOffset() + this.mappedFileSize; // 文件末尾偏移量
             if (fileTailOffset > offset) {
                 if (offset >= file.getFileFromOffset()) {
                     file.setWrotePosition((int) (offset % this.mappedFileSize));
                     file.setCommittedPosition((int) (offset % this.mappedFileSize));
                     file.setFlushedPosition((int) (offset % this.mappedFileSize));
-                } else {
+                } else { // 删除多余文件
                     file.destroy(1000);
                     willRemoveFiles.add(file);
                 }
@@ -145,7 +149,10 @@ public class MappedFileQueue {
     }
 
     /**
-     * 加载所有的文件，映射到内存中
+     * 加载所有的文件，映射到内存中，
+     * 由于只用到了一个索引值，该值为文件大小值，所以每个映射文件的写指针、堆内刷盘指针、堆外刷盘指针都默认
+     * 是当前文件的大小，即指针指向最后一个位置
+     * NOTE: 不能用文件名，因为文件名的对应的物理位置，是等于或者超过文件大小的。
      */
     public boolean load() {
         File dir = new File(this.storePath);

@@ -165,11 +165,15 @@ public class DefaultMessageStore implements MessageStore {
         lockFile = new RandomAccessFile(file, "rw");
     }
 
+    /**
+     * 根据CommitLog最大消费偏移进度来删除脏的consumeQueue文件
+     */
     public void truncateDirtyLogicFiles(long phyOffset) {
         ConcurrentMap<String, ConcurrentMap<Integer, ConsumeQueue>> tables = DefaultMessageStore.this.consumeQueueTable;
 
         for (ConcurrentMap<Integer, ConsumeQueue> maps : tables.values()) {
             for (ConsumeQueue logic : maps.values()) {
+                // 清理ConsumeQueue脏数据
                 logic.truncateDirtyLogicFiles(phyOffset);
             }
         }
@@ -199,13 +203,14 @@ public class DefaultMessageStore implements MessageStore {
 
             if (result) {
                 // 加载checkPoint
+                // 数据安全落地的checkPoint，决定commitLog文件从哪里开始恢复
                 this.storeCheckpoint =
                     new StoreCheckpoint(StorePathConfigHelper.getStoreCheckpoint(this.messageStoreConfig.getStorePathRootDir()));
 
                 // 加载索引文件
                 this.indexService.load(lastExitOK);
 
-                // 恢复
+                // 真正的恢复
                 this.recover(lastExitOK);
 
                 log.info("load over, and the max phy offset = {}", this.getMaxPhyOffset());
@@ -1434,14 +1439,23 @@ public class DefaultMessageStore implements MessageStore {
     // 数据恢复
     private void recover(final boolean lastExitOK) {
         // 从ConsumeQueue中恢复
+        // 每个队列的最大逻辑偏移
+        // 每个队列最后的一个消息在CommitLog绝对物理位置
+        // 但这些数据和commitLog不一致，待会恢复CommitLog的时候需要重建或者删除脏数据
+        // 最后返回 : 在所有的逻辑队列最后一个消息的commitLog绝对物理位置，取最大值
+
+        // 恢复ConsumeQueue, 恢复正常的wrotePosition, flushPosition, commitPosition
         long maxPhyOffsetOfConsumeQueue = this.recoverConsumeQueue();
 
         if (lastExitOK) {
+            // commitLog安全退出，正常恢复CommitLog文件，保持和ConsumeQueue一致
             this.commitLog.recoverNormally(maxPhyOffsetOfConsumeQueue);
         } else {
+            // commitLog未正常退出，异常情况下恢复CommitLog文件，保持和ConsumeQueue一致
             this.commitLog.recoverAbnormally(maxPhyOffsetOfConsumeQueue);
         }
-
+        // 恢复CommitLog维护的这个HashMap，每个Topic的每个队列的最大逻辑偏移
+        // 修正每个Topic的每个队列的最小逻辑偏移
         this.recoverTopicQueueTable();
     }
 
@@ -1464,12 +1478,21 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
+    /**
+     *         // 从ConsumeQueue中恢复
+     *         // 每个队列的最大逻辑偏移
+     *         // 每个队列最后的一个消息在CommitLog绝对物理位置
+     *         // 但这些数据和commitLog不一致，待会恢复CommitLog的时候需要重建或者删除脏数据
+     *         // 最后返回 : 在所有的逻辑队列最后一个消息的commitLog绝对物理位置，取最大值
+     */
     private long recoverConsumeQueue() {
         long maxPhysicOffset = -1;
         for (ConcurrentMap<Integer, ConsumeQueue> maps : this.consumeQueueTable.values()) {
             for (ConsumeQueue logic : maps.values()) {
+                // 逻辑队列恢复(根据文件内容与文件大小以及文件初始偏移位置)
                 logic.recover();
                 if (logic.getMaxPhysicOffset() > maxPhysicOffset) {
+                    // 以逻辑队列中获取的最大物理偏移位置为准
                     maxPhysicOffset = logic.getMaxPhysicOffset();
                 }
             }
@@ -1526,11 +1549,13 @@ public class DefaultMessageStore implements MessageStore {
 
     public void doDispatch(DispatchRequest req) {
         for (CommitLogDispatcher dispatcher : this.dispatcherList) {
+            // 构建consumeQueue以及Index数据结构
             dispatcher.dispatch(req);
         }
     }
 
     public void putMessagePositionInfo(DispatchRequest dispatchRequest) {
+        // 根据Topic以及QueueId找到对应的ConsumeQueue
         ConsumeQueue cq = this.findConsumeQueue(dispatchRequest.getTopic(), dispatchRequest.getQueueId());
         cq.putMessagePositionInfoWrapper(dispatchRequest);
     }

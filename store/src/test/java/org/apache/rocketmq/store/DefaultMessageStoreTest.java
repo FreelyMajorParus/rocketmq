@@ -106,8 +106,8 @@ public class DefaultMessageStoreTest {
 
     private MessageStore buildMessageStore() throws Exception {
         MessageStoreConfig messageStoreConfig = new MessageStoreConfig();
-        messageStoreConfig.setMappedFileSizeCommitLog(1024 * 1024 * 10);
-        messageStoreConfig.setMappedFileSizeConsumeQueue(1024 * 1024 * 10);
+        messageStoreConfig.setMappedFileSizeCommitLog(1024 * 10);
+        messageStoreConfig.setMappedFileSizeConsumeQueue(1024);
         messageStoreConfig.setMaxHashSlotNum(10000);
         messageStoreConfig.setMaxIndexNum(100 * 100);
         messageStoreConfig.setFlushDiskType(FlushDiskType.SYNC_FLUSH);
@@ -511,7 +511,7 @@ public class DefaultMessageStoreTest {
     public void testRecover() throws Exception {
         String topic = "recoverTopic";
         MessageBody = StoreMessage.getBytes();
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 1000; i++) {
             MessageExtBrokerInner messageExtBrokerInner = buildMessage();
             messageExtBrokerInner.setTopic(topic);
             messageExtBrokerInner.setQueueId(0);
@@ -552,11 +552,12 @@ public class DefaultMessageStoreTest {
 
         messageStore.shutdown();
 
-        //damage last message
+        //damage last message 破坏最后一个消息
         damageCommitlog(secondLastPhyOffset);
 
         //reboot
         messageStore = buildMessageStore();
+        // 异常恢复
         load = messageStore.load();
         assertTrue(load);
         messageStore.start();
