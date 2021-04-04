@@ -1369,7 +1369,9 @@ public class DefaultMessageStore implements MessageStore {
      * 定时清理commitLog和consumeQueue文件
      */
     private void cleanFilesPeriodically() {
+        // 删除过期的commitLog文件
         this.cleanCommitLogService.run();
+        // 删除过期的ConsumeQueue文件
         this.cleanConsumeQueueService.run();
     }
 
@@ -1669,7 +1671,7 @@ public class DefaultMessageStore implements MessageStore {
             int deleteCount = 0;
             // 文件存留的时间，默认是72h
             long fileReservedTime = DefaultMessageStore.this.getMessageStoreConfig().getFileReservedTime();
-            // 每隔多久移除一个文件
+            // 每隔多久移除一个文件，删一个文件之后要休息一会儿，不要连续删除，会导致IO抖动
             int deletePhysicFilesInterval = DefaultMessageStore.this.getMessageStoreConfig().getDeleteCommitLogFilesInterval();
             // 每隔多久需要做强制删除(因为删除的时候，如果该文件正有引用，就不能删除，但是这个标识可以配置多久可以强制删除一次)
             int destroyMapedFileIntervalForcibly = DefaultMessageStore.this.getMessageStoreConfig().getDestroyMapedFileIntervalForcibly();

@@ -45,7 +45,7 @@ public abstract class ReferenceResource {
             this.available = false;
             this.firstShutdownTimestamp = System.currentTimeMillis();
             this.release();
-        } else if (this.getRefCount() > 0) {
+        } else if (this.getRefCount() > 0) { // 该文件正在被引用，如果强删的时间到了，那就必须要删了
             if ((System.currentTimeMillis() - this.firstShutdownTimestamp) >= intervalForcibly) {
                 this.refCount.set(-1000 - this.getRefCount());
                 this.release();
