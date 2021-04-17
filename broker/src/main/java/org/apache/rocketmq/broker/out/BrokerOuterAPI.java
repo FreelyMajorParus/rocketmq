@@ -111,6 +111,20 @@ public class BrokerOuterAPI {
         this.remotingClient.updateNameServerAddressList(lst);
     }
 
+    /**
+     * 注册Broker到远程NameServer
+     * @param clusterName
+     * @param brokerAddr
+     * @param brokerName
+     * @param brokerId
+     * @param haServerAddr
+     * @param topicConfigWrapper
+     * @param filterServerList
+     * @param oneway
+     * @param timeoutMills
+     * @param compressed
+     * @return
+     */
     public List<RegisterBrokerResult> registerBrokerAll(
         final String clusterName,
         final String brokerAddr,
@@ -141,6 +155,7 @@ public class BrokerOuterAPI {
             final byte[] body = requestBody.encode(compressed);
             final int bodyCrc32 = UtilAll.crc32(body);
             requestHeader.setBodyCrc32(bodyCrc32);
+            // 为什么要使用多线程
             final CountDownLatch countDownLatch = new CountDownLatch(nameServerAddressList.size());
             for (final String namesrvAddr : nameServerAddressList) {
                 brokerOuterExecutor.execute(new Runnable() {
@@ -191,6 +206,7 @@ public class BrokerOuterAPI {
             return null;
         }
 
+        // 创建请求，注册到注册中心
         RemotingCommand response = this.remotingClient.invokeSync(namesrvAddr, request, timeoutMills);
         assert response != null;
         switch (response.getCode()) {

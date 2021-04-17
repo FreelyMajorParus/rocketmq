@@ -135,12 +135,19 @@ public class NamesrvStartup {
         return controller;
     }
 
+    /**
+     * 启动NameServer控制器
+     * @param controller
+     * @return
+     * @throws Exception
+     */
     public static NamesrvController start(final NamesrvController controller) throws Exception {
 
         if (null == controller) {
             throw new IllegalArgumentException("NamesrvController is null");
         }
 
+        // 初始化控制器
         boolean initResult = controller.initialize();
         if (!initResult) {
             controller.shutdown();

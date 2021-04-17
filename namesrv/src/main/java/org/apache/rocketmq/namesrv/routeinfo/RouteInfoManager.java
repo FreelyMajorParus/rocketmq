@@ -51,7 +51,9 @@ public class RouteInfoManager {
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private final HashMap<String/* topic */, List<QueueData>> topicQueueTable;
     private final HashMap<String/* brokerName */, BrokerData> brokerAddrTable;
+    // 一个集群下面包含多少个Broker
     private final HashMap<String/* clusterName */, Set<String/* brokerName */>> clusterAddrTable;
+    // 存活的Broker表
     private final HashMap<String/* brokerAddr */, BrokerLiveInfo> brokerLiveTable;
     private final HashMap<String/* brokerAddr */, List<String>/* Filter Server */> filterServerTable;
 
@@ -111,6 +113,8 @@ public class RouteInfoManager {
         RegisterBrokerResult result = new RegisterBrokerResult();
         try {
             try {
+                // 读写锁一般的使用场景，就是读多写少
+                // 申请写锁
                 this.lock.writeLock().lockInterruptibly();
 
                 Set<String> brokerNames = this.clusterAddrTable.get(clusterName);
@@ -150,6 +154,7 @@ public class RouteInfoManager {
                             topicConfigWrapper.getTopicConfigTable();
                         if (tcTable != null) {
                             for (Map.Entry<String, TopicConfig> entry : tcTable.entrySet()) {
+                                // 创建和更新Queue信息
                                 this.createAndUpdateQueueData(brokerName, entry.getValue());
                             }
                         }
@@ -214,6 +219,11 @@ public class RouteInfoManager {
         }
     }
 
+    /**
+     * 创建或者更新队列信息
+     * @param brokerName broker名称
+     * @param topicConfig topic配置信息
+     */
     private void createAndUpdateQueueData(final String brokerName, final TopicConfig topicConfig) {
         QueueData queueData = new QueueData();
         queueData.setBrokerName(brokerName);
@@ -224,8 +234,10 @@ public class RouteInfoManager {
 
         List<QueueData> queueDataList = this.topicQueueTable.get(topicConfig.getTopicName());
         if (null == queueDataList) {
+            // 如果队列信息为空, 手册注册
             queueDataList = new LinkedList<QueueData>();
             queueDataList.add(queueData);
+            // 直接插入
             this.topicQueueTable.put(topicConfig.getTopicName(), queueDataList);
             log.info("new topic registered, {} {}", topicConfig.getTopicName(), queueData);
         } else {
@@ -234,18 +246,20 @@ public class RouteInfoManager {
             Iterator<QueueData> it = queueDataList.iterator();
             while (it.hasNext()) {
                 QueueData qd = it.next();
-                if (qd.getBrokerName().equals(brokerName)) {
+                if (qd.getBrokerName().equals(brokerName)) { // 观察原始的集合里面是否已经有该Broker对应的队列信息了
                     if (qd.equals(queueData)) {
                         addNewOne = false;
                     } else {
                         log.info("topic changed, {} OLD: {} NEW: {}", topicConfig.getTopicName(), qd,
                             queueData);
+                        // 尝试将old的给去掉
                         it.remove();
                     }
                 }
             }
 
             if (addNewOne) {
+                // 将新的数据插入进去
                 queueDataList.add(queueData);
             }
         }
@@ -752,7 +766,13 @@ public class RouteInfoManager {
     }
 }
 
+/**
+ * Broker活跃信息
+ */
 class BrokerLiveInfo {
+    /**
+     * 最近更新的时间戳
+     */
     private long lastUpdateTimestamp;
     private DataVersion dataVersion;
     private Channel channel;

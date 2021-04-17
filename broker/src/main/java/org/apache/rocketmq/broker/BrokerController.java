@@ -977,7 +977,7 @@ public class BrokerController {
             this.brokerConfig.getBrokerName(),
             this.brokerConfig.getBrokerId(),
             this.getHAServerAddr(),
-            topicConfigWrapper,
+            topicConfigWrapper, /*带有Topic路由信息*/
             this.filterServerManager.buildNewFilterServerList(),
             oneway,
             this.brokerConfig.getRegisterBrokerTimeoutMills(),

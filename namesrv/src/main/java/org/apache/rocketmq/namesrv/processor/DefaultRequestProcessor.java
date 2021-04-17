@@ -88,7 +88,7 @@ public class DefaultRequestProcessor extends AsyncNettyRequestProcessor implemen
                 return this.deleteKVConfig(ctx, request);
             case RequestCode.QUERY_DATA_VERSION:
                 return queryBrokerTopicConfig(ctx, request);
-            case RequestCode.REGISTER_BROKER:
+            case RequestCode.REGISTER_BROKER: // Broker的注册请求
                 Version brokerVersion = MQVersion.value2Version(request.getVersion());
                 if (brokerVersion.ordinal() >= MQVersion.Version.V3_0_11.ordinal()) {
                     return this.registerBrokerWithFilterServer(ctx, request);
@@ -208,6 +208,7 @@ public class DefaultRequestProcessor extends AsyncNettyRequestProcessor implemen
 
         if (request.getBody() != null) {
             try {
+                // 数据解码
                 registerBrokerBody = RegisterBrokerBody.decode(request.getBody(), requestHeader.isCompressed());
             } catch (Exception e) {
                 throw new RemotingCommandException("Failed to decode RegisterBrokerBody", e);
@@ -217,6 +218,7 @@ public class DefaultRequestProcessor extends AsyncNettyRequestProcessor implemen
             registerBrokerBody.getTopicConfigSerializeWrapper().getDataVersion().setTimestamp(0);
         }
 
+        // 注册Broker
         RegisterBrokerResult result = this.namesrvController.getRouteInfoManager().registerBroker(
             requestHeader.getClusterName(),
             requestHeader.getBrokerAddr(),
