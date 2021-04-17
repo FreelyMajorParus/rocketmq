@@ -51,32 +51,32 @@ public class Producer {
          */
         producer.start();
 
-            try {
-
-                for(int i = 0; i < 100;i++) {
-                    /*
-                     * Create a message instance, specifying topic, tag and message body.
-                     */
-                    Message msg = new Message("TopicTest" /* Topic */,
-                            "TagA" /* Tag */,
-                            ("Hello RocketMQ " + 1).getBytes(RemotingHelper.DEFAULT_CHARSET) /* Message body */
-                    );
-
-                    /*
-                     * Call send message to deliver message to one of brokers.
-                     */
-                    SendResult sendResult = producer.send(msg);
-
-                    System.out.printf("%s%n", sendResult);
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-                Thread.sleep(1000);
-            }
+//            try {
+//
+//                for(int i = 0; i < 100;i++) {
+//                    /*
+//                     * Create a message instance, specifying topic, tag and message body.
+//                     */
+//                    Message msg = new Message("TopicTest" /* Topic */,
+//                            "TagA" /* Tag */,
+//                            ("Hello RocketMQ " + 1).getBytes(RemotingHelper.DEFAULT_CHARSET) /* Message body */
+//                    );
+//
+//                    /*
+//                     * Call send message to deliver message to one of brokers.
+//                     */
+//                    SendResult sendResult = producer.send(msg);
+//
+//                    System.out.printf("%s%n", sendResult);
+//                }
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//                Thread.sleep(1000);
+//            }
 
         /*
          * Shut down once the producer instance is not longer in use.
          */
-        producer.shutdown();
+//        producer.shutdown();
     }
 }

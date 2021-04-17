@@ -48,7 +48,7 @@ public class Validators {
     }
 
     /**
-     * Validate group
+     * Validate group 校验长度以及正则校验
      */
     public static void checkGroup(String group) throws MQClientException {
         if (UtilAll.isBlank(group)) {
@@ -78,6 +78,12 @@ public class Validators {
         return matcher.matches();
     }
 
+    /**
+     * 消息校验,消息体、topic校验，系统御用的Topic，不可以往里面发送消息
+     * @param msg
+     * @param defaultMQProducer
+     * @throws MQClientException
+     */
     public static void checkMessage(Message msg, DefaultMQProducer defaultMQProducer)
         throws MQClientException {
         if (null == msg) {
@@ -87,7 +93,7 @@ public class Validators {
         Validators.checkTopic(msg.getTopic());
         Validators.isNotAllowedSendTopic(msg.getTopic());
 
-        // body
+        // 消息体不能为空
         if (null == msg.getBody()) {
             throw new MQClientException(ResponseCode.MESSAGE_ILLEGAL, "the message body is null");
         }
@@ -96,6 +102,7 @@ public class Validators {
             throw new MQClientException(ResponseCode.MESSAGE_ILLEGAL, "the message body length is zero");
         }
 
+        // 消息体默认为最大4M
         if (msg.getBody().length > defaultMQProducer.getMaxMessageSize()) {
             throw new MQClientException(ResponseCode.MESSAGE_ILLEGAL,
                 "the message body size over max value, MAX: " + defaultMQProducer.getMaxMessageSize());

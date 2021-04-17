@@ -273,6 +273,10 @@ public class ClientConfig {
         this.language = language;
     }
 
+    /**
+     * 如果自定义了namespace, 则使用自定义
+     * 如果未定义，则
+     */
     public String getNamespace() {
         if (StringUtils.isNotEmpty(namespace)) {
             return namespace;

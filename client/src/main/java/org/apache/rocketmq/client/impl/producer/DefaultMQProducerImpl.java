@@ -183,11 +183,14 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                 this.checkConfig();
 
                 if (!this.defaultMQProducer.getProducerGroup().equals(MixAll.CLIENT_INNER_PRODUCER_GROUP)) {
+                    // 将PID作为instanceName
                     this.defaultMQProducer.changeInstanceNameToPID();
                 }
 
+                // 构造MQClientInstance
                 this.mQClientFactory = MQClientManager.getInstance().getOrCreateMQClientInstance(this.defaultMQProducer, rpcHook);
 
+                // 注册producer
                 boolean registerOK = mQClientFactory.registerProducer(this.defaultMQProducer.getProducerGroup(), this);
                 if (!registerOK) {
                     this.serviceState = ServiceState.CREATE_JUST;
@@ -204,6 +207,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
                 log.info("the producer [{}] start OK. sendMessageWithVIPChannel={}", this.defaultMQProducer.getProducerGroup(),
                     this.defaultMQProducer.isSendMessageWithVIPChannel());
+                // 状态变更为RUNNING，运行状态
                 this.serviceState = ServiceState.RUNNING;
                 break;
             case RUNNING:
@@ -543,10 +547,10 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     }
 
     private SendResult sendDefaultImpl(
-        Message msg,
-        final CommunicationMode communicationMode,
-        final SendCallback sendCallback,
-        final long timeout
+        Message msg, /*消息*/
+        final CommunicationMode communicationMode, /*发送模式,SYNC, ASYNC, ONEWAY*/
+        final SendCallback sendCallback, /*回调机制*/
+        final long timeout /*超时时间，默认为3秒*/
     ) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
         this.makeSureStateOK();
         Validators.checkMessage(msg, this.defaultMQProducer);

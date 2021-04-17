@@ -228,12 +228,14 @@ public class MQClientInstance {
                 case CREATE_JUST:
                     this.serviceState = ServiceState.START_FAILED;
                     // If not specified,looking address from name server
-                    if (null == this.clientConfig.getNamesrvAddr()) {
-                        this.mQClientAPIImpl.fetchNameServerAddr();
+                    if (null == this.clientConfig.getNamesrvAddr()) { // 获取本地配置好的Namesrv地址
+                        this.mQClientAPIImpl.fetchNameServerAddr(); // 从远程获取Namesrv地址
                     }
                     // Start request-response channel
+                    // 接收远程请求
                     this.mQClientAPIImpl.start();
                     // Start various schedule tasks
+                    // 启动定时任务
                     this.startScheduledTask();
                     // Start pull service
                     this.pullMessageService.start();
@@ -321,6 +323,9 @@ public class MQClientInstance {
         return clientId;
     }
 
+    /**
+     * 从远程获取Topic的路由信息
+     */
     public void updateTopicRouteInfoFromNameServer() {
         Set<String> topicList = new HashSet<String>();
 
@@ -334,6 +339,7 @@ public class MQClientInstance {
                     Set<SubscriptionData> subList = impl.subscriptions();
                     if (subList != null) {
                         for (SubscriptionData subData : subList) {
+                            // 收集当前客户端作为Consumer订阅的所有Topic
                             topicList.add(subData.getTopic());
                         }
                     }
@@ -348,6 +354,7 @@ public class MQClientInstance {
                 Entry<String, MQProducerInner> entry = it.next();
                 MQProducerInner impl = entry.getValue();
                 if (impl != null) {
+                    // 收集当前客户端作为Producer发布的所有Topic
                     Set<String> lst = impl.getPublishTopicList();
                     topicList.addAll(lst);
                 }
@@ -355,6 +362,7 @@ public class MQClientInstance {
         }
 
         for (String topic : topicList) {
+            // 将当前客户端涉及的所有Topic都从远程获取路由信息
             this.updateTopicRouteInfoFromNameServer(topic);
         }
     }
@@ -401,21 +409,24 @@ public class MQClientInstance {
                         while (it.hasNext()) {
                             Entry<Long, String> ee = it.next();
                             String addr = ee.getValue();
-                            if (!this.isBrokerAddrExistInTopicRouteTable(addr)) {
+                            if (!this.isBrokerAddrExistInTopicRouteTable(addr)) { // broker地址是否仍然存在于topicRouteTable
+                                // 中，不存在说明掉线了
                                 it.remove();
                                 log.info("the broker addr[{} {}] is offline, remove it", brokerName, addr);
                             }
                         }
 
-                        if (cloneAddrTable.isEmpty()) {
+                        if (cloneAddrTable.isEmpty()) {// 当前brokerName里面所有的brokerId都掉线了，那就该brokerName整体清空
                             itBrokerTable.remove();
                             log.info("the broker[{}] name's host is offline, remove it", brokerName);
                         } else {
+                            // 否则更新
                             updatedTable.put(brokerName, cloneAddrTable);
                         }
                     }
 
                     if (!updatedTable.isEmpty()) {
+                        // 放回原先的缓存中
                         this.brokerAddrTable.putAll(updatedTable);
                     }
                 } finally {
@@ -479,6 +490,9 @@ public class MQClientInstance {
         }
     }
 
+    /**
+     * 持久化所有ConsumerOffset
+     */
     private void persistAllConsumerOffset() {
         Iterator<Entry<String, MQConsumerInner>> it = this.consumerTable.entrySet().iterator();
         while (it.hasNext()) {
@@ -602,6 +616,9 @@ public class MQClientInstance {
         }
     }
 
+    /**
+     * 从远程NameServer服务拉取路由信息
+     */
     public boolean updateTopicRouteInfoFromNameServer(final String topic, boolean isDefault,
         DefaultMQProducer defaultMQProducer) {
         try {
@@ -619,6 +636,7 @@ public class MQClientInstance {
                             }
                         }
                     } else {
+                        // 从远程拉取当前Topic对应的路由信息
                         topicRouteData = this.mQClientAPIImpl.getTopicRouteInfoFromNameServer(topic, 1000 * 3);
                     }
                     if (topicRouteData != null) {
@@ -634,10 +652,12 @@ public class MQClientInstance {
                             TopicRouteData cloneTopicRouteData = topicRouteData.cloneTopicRouteData();
 
                             for (BrokerData bd : topicRouteData.getBrokerDatas()) {
+                                // 将broker的地址缓存起来
                                 this.brokerAddrTable.put(bd.getBrokerName(), bd.getBrokerAddrs());
                             }
 
                             // Update Pub info
+                            // 更新发布信息
                             {
                                 TopicPublishInfo publishInfo = topicRouteData2TopicPublishInfo(topic, topicRouteData);
                                 publishInfo.setHaveTopicRouterInfo(true);
@@ -652,6 +672,7 @@ public class MQClientInstance {
                             }
 
                             // Update sub info
+                            // 更新订阅信息
                             {
                                 Set<MessageQueue> subscribeInfo = topicRouteData2TopicSubscribeInfo(topic, topicRouteData);
                                 Iterator<Entry<String, MQConsumerInner>> it = this.consumerTable.entrySet().iterator();

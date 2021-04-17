@@ -212,6 +212,9 @@ public class MQClientAPIImpl {
         return remotingClient;
     }
 
+    /**
+     * 从远程获取NS地址
+     */
     public String fetchNameServerAddr() {
         try {
             String addrs = this.topAddressing.fetchNSAddr();
